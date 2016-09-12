@@ -36,7 +36,7 @@ class DroplrServer {
     this.url = url.parse(config.url);
     this.email = ANONYMOUS_USER_EMAIL;
     this.password = ANONYMOUS_USER_PASSWORD;
-    this.authType = AUTH_TYPE.DROPLR2;
+    this.authType = AUTH_TYPE.DROPLR;
   }
   useAccount(email, password) {
     this.email = email;
