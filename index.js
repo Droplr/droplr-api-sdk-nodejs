@@ -21,10 +21,11 @@ const AUTH_TYPE = {
 class DroplrServer {
   /*
    * @param  config     Object
-   * @config url        String URL of Droplr Server (Required)
-   * @config publicKey  String (Required)
-   * @config privateKey String (Required)
-   * @config userAgent  String (Optional)
+   * @config url        String  URL of Droplr Server (Required)
+   * @config publicKey  String  (Required)
+   * @config privateKey String  (Required)
+   * @config userAgent  String  (Optional)
+   * @config plaintext  Boolean Use old plaintext authentication (Optional)
    */
   constructor(config) {
     [ 'url', 'publicKey', 'privateKey' ].forEach(setting => {
@@ -36,11 +37,14 @@ class DroplrServer {
     this.url = url.parse(config.url);
     this.email = ANONYMOUS_USER_EMAIL;
     this.password = ANONYMOUS_USER_PASSWORD;
-    this.authType = AUTH_TYPE.DROPLR;
+    this.authType = config.plaintext === true ? AUTH_TYPE.ANON : AUTH_TYPE.DROPLR2;
   }
   useAccount(email, password) {
     this.email = email;
     this.password = password;
+    if(this.authType === AUTH_TYPE.ANON) {
+      this.authType = AUTH_TYPE.DROPLR;
+    }
     return this;
   }
   /*
@@ -52,7 +56,7 @@ class DroplrServer {
     return this._performRequest({
       method: 'POST',
       path: '/account',
-      body: user
+      body: Object.assign({}, user, { password: sha1(user.password) })
     });
   }
   deleteAccount() {
@@ -143,7 +147,6 @@ class DroplrServer {
     headers['Content-Length'] = sendBody.length;
 
     headers['Authorization'] = this._getAuthToken(req, options.modifyConfig);
-    console.log(headers['Authorization']);
 
     if(options.modifyRequest) {
       req = options.modifyRequest(req);
@@ -202,13 +205,7 @@ class DroplrServer {
         return util.format('%s %s:%s', this.authType, key, signature);
       case AUTH_TYPE.DROPLR2:
         const signatureV2 = calculateRfc2104Hmac(stringToSign, config.privateKey);
-        console.log(stringToSign, config.privateKey, signatureV2);
-        // app private key is 160bit (40bytes hex), pad to 192bit with 8 bytes
-        const cipherKey = new Buffer(config.privateKey + '00000000', 'hex');
-        const cipher = crypto.createCipheriv('AES-192-CBC', cipherKey, this.config.cipherIv);
-        let encryptedPw = cipher.update(this.password, 'utf8', 'base64');
-        encryptedPw += cipher.final('base64');
-        return util.format('%s %s:%s:%s', this.authType, key, signatureV2, encryptedPw);
+        return util.format('%s %s:%s:%s', this.authType, key, signatureV2, sha1(this.password));
     }
   }
 }
