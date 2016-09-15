@@ -233,9 +233,12 @@ function toBase64(data) {
 }
 
 function createStringToSign(req) {
+  // Query parameters are not part of the string to sign
+  const argsPos = req.path.indexOf('?');
+  const origPath = argsPos !== -1 ? req.path.substr(0, argsPos) : req.path;
   return util.format('%s %s %s\n%s\n%s',
     req.method,
-    req.path,
+    origPath,
     'HTTP/1.1',
     req.headers['Content-Type'] || '',
     req.headers['Date']);
