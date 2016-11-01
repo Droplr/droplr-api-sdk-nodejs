@@ -6,6 +6,7 @@ const path = require('path');
 const fs = require('fs');
 const http = require('http');
 const https = require('https');
+const exec = require('child_process').exec;
 
 const mime = require('mime');
 
@@ -75,15 +76,45 @@ class DroplrServer {
     });
   }
   createDropFromFile(file) {
-    return readFileToBuffer(file).then(data => this._performRequest({
+    return this._performRequest({
+      returnReq: true,
       method: 'POST',
       path: '/files',
       headers: {
         'x-droplr-filename': path.basename(file),
         'Content-Type': mime.lookup(file)
       },
-      body: data
-    }));
+      body: 'something'
+    }).then(req => {
+      console.log(req);
+      delete req.headers['Content-Length'];
+      return new Promise((resolve, reject) => {
+        const cmd = `curl --data-binary "@${file}" -X POST ${
+          Object.keys(req.headers).map(headerName =>
+            '-H "' + headerName + ':' + req.headers[headerName] + '"'
+          ).join(' ')} ${req.protocol}//${req.hostname}${req.port ? ':' + req.port : ''}${req.path}`;
+        console.log(cmd);
+        exec(cmd, (error, stdout, stderr) => {
+            if(error) {
+              reject(error);
+              return;
+            }
+            console.log(stderr);
+            let body;
+            try {
+              body = JSON.parse(stdout);
+            } catch(error) {
+              reject(error);
+              return;
+            }
+            console.log(body);
+            resolve({
+              statusCode: 201,
+              body
+            });
+          });
+      });
+    });
   }
   updateDrop(dropId, updateFields) {
     return this._performRequest({
@@ -179,6 +210,12 @@ class DroplrServer {
           });
         });
       };
+
+      // Dump output for cUrl
+      if(options.returnReq) {
+        resolve(req);
+        return;
+      }
 
       if(req.protocol === 'https:')
         reqHandle = https.request(req, responseHandler);
