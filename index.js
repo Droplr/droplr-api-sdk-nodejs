@@ -38,10 +38,12 @@ class DroplrServer {
     this.email = ANONYMOUS_USER_EMAIL;
     this.password = ANONYMOUS_USER_PASSWORD;
     this.authType = config.plaintext === true ? AUTH_TYPE.ANON : AUTH_TYPE.DROPLR2;
+    this.isHashed = false; // If use account is not set
   }
-  useAccount(email, password) {
+  useAccount(email, password, isHashed=false) {
     this.email = email;
     this.password = password;
+    this.isHashed = isHashed;
     if(this.authType === AUTH_TYPE.ANON) {
       this.authType = AUTH_TYPE.DROPLR;
     }
@@ -52,6 +54,12 @@ class DroplrServer {
    *    Fields defined at: https://github.com/Droplr/docs/blob/master/source/includes/_private-operations.md#input-parameters
    *    Password passed as plaintext, will automatically be hashed.
    */
+  getAccount( token ) {
+    return this._performRequest({
+      method: 'GET',
+      path: '/api/userinfo/' + token,
+    })
+  }
   createAccount(user) {
     return this._performRequest({
       method: 'POST',
@@ -77,9 +85,8 @@ class DroplrServer {
   createDropFromFile(file) {
     return readFileToBuffer(file).then(data => this._performRequest({
       method: 'POST',
-      path: '/files',
+      path: '/files?filename=' + path.basename(file),
       headers: {
-        'x-droplr-filename': path.basename(file),
         'Content-Type': mime.lookup(file)
       },
       body: data
@@ -127,7 +134,7 @@ class DroplrServer {
        'Accept': 'application/json; version=' + (options.apiVersion || '0.9'),
        'User-Agent': this.config.userAgent
       }, options.headers);
-
+    
     let req = {
       method: options.method || 'GET',
       protocol: this.url.protocol,
@@ -136,7 +143,7 @@ class DroplrServer {
       path: options.path,
       headers
     };
-
+    
     let sendBody;
     if(typeof options.body === 'object' && !(options.body instanceof Buffer)) {
       headers['Content-Type'] = 'application/json';
@@ -147,18 +154,17 @@ class DroplrServer {
     headers['Content-Length'] = sendBody.length;
 
     headers['Authorization'] = this._getAuthToken(req, options.modifyConfig);
-
     if(options.modifyRequest) {
       req = options.modifyRequest(req);
     }
-
+    
     return new Promise((resolve, reject) => {
       let reqHandle;
       const responseHandler = response => {
         // Server Error
-        if('droplr-errorcode' in response.headers)
+        if('droplr-errorcode' in response.headers) 
           return reject(new DroplrApiError(response));
-
+        
         let body = '';
         response.setEncoding('utf8');
         response.on('data', chunk => body += chunk);
@@ -200,12 +206,12 @@ class DroplrServer {
     switch(this.authType) {
       case AUTH_TYPE.DROPLR:
       case AUTH_TYPE.ANON:
-        const secret = util.format('%s:%s', config.privateKey, sha1(this.password));
+        const secret = util.format('%s:%s', config.privateKey, (this.isHashed) ? this.password : sha1(this.password));
         const signature = calculateRfc2104Hmac(stringToSign, secret);
         return util.format('%s %s:%s', this.authType, key, signature);
       case AUTH_TYPE.DROPLR2:
         const signatureV2 = calculateRfc2104Hmac(stringToSign, config.privateKey);
-        return util.format('%s %s:%s:%s', this.authType, key, signatureV2, sha1(this.password));
+        return util.format('%s %s:%s:%s', this.authType, key, signatureV2, (this.isHashed) ? this.password : sha1(this.password));
     }
   }
 }
