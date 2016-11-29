@@ -105,6 +105,14 @@ class DroplrServer {
       skipParseResponse: true
     })
   }
+  getAllDrops(filter) {
+    var tagPath = (filter != undefined) ? '?tags[]=' + filter : ''
+    console.log("tag path is ", tagPath)
+    return this._performRequest({
+      path: '/search/' + tagPath,
+      skipParseResponse: false
+    })
+  }
   /*
    * @param options           Object
    * @option method           String
