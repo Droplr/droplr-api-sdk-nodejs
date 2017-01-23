@@ -85,7 +85,7 @@ class DroplrServer {
   createDropFromFile(file) {
     return readFileToBuffer(file).then(data => this._performRequest({
       method: 'POST',
-      path: '/files?filename=' + path.basename(file),
+      path: '/files?filename=' + (path.basename(file)).replace( / /g, '-' ),
       headers: {
         'Content-Type': mime.lookup(file)
       },
@@ -107,7 +107,6 @@ class DroplrServer {
   }
   getAllDrops(filter) {
     var tagPath = (filter != undefined) ? '?tags[]=' + filter : ''
-    console.log("tag path is ", tagPath)
     return this._performRequest({
       path: '/search/' + tagPath,
       skipParseResponse: false
@@ -151,7 +150,6 @@ class DroplrServer {
       path: options.path,
       headers
     };
-    
     let sendBody;
     if(typeof options.body === 'object' && !(options.body instanceof Buffer)) {
       headers['Content-Type'] = 'application/json';
@@ -167,6 +165,7 @@ class DroplrServer {
     }
     
     return new Promise((resolve, reject) => {
+      
       let reqHandle;
       const responseHandler = response => {
         // Server Error
@@ -180,12 +179,12 @@ class DroplrServer {
           let parsedBody;
           if(!options.skipParseResponse) {
             try {
+              //console.log(body)
               parsedBody = JSON.parse(body);
             } catch(error) {
               return reject(error);
             }
           } else { parsedBody = body; }
-
           resolve({
             statusCode: response.statusCode,
             headers: response.headers,
@@ -193,7 +192,6 @@ class DroplrServer {
           });
         });
       };
-
       if(req.protocol === 'https:')
         reqHandle = https.request(req, responseHandler);
       else if(req.protocol === 'http:')
