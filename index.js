@@ -83,14 +83,28 @@ class DroplrServer {
     });
   }
   createDropFromFile(file) {
-    return readFileToBuffer(file).then(data => this._performRequest({
+    // return readFileToBuffer(file).then(data => this._performRequest({
+    //   method: 'POST',
+    //   path: '/files?filename=' + (path.basename(file)).replace( / /g, '-' ),
+    //   headers: {
+    //     'Content-Type': mime.lookup(file)
+    //   },
+    //   body: data
+    // }));
+    let size = fs.lstatSync(file).size;
+    let bytes = 0;
+
+    return this._performRequest({
       method: 'POST',
       path: '/files?filename=' + (path.basename(file)).replace( / /g, '-' ),
       headers: {
-        'Content-Type': mime.lookup(file)
+        'Content-Type': mime.lookup(file),
+        'Content-Length': size
       },
-      body: data
-    }));
+      body: fs.createReadStream(file).on('data', (chunk) => {
+        console.log(bytes += chunk.length, size);
+      })
+    })
   }
   updateDrop(dropId, updateFields) {
     return this._performRequest({
@@ -141,7 +155,7 @@ class DroplrServer {
        'Accept': 'application/json; version=' + (options.apiVersion || '0.9'),
        'User-Agent': this.config.userAgent
       }, options.headers);
-    
+
     let req = {
       method: options.method || 'GET',
       protocol: this.url.protocol,
@@ -151,27 +165,27 @@ class DroplrServer {
       headers
     };
     let sendBody;
-    if(typeof options.body === 'object' && !(options.body instanceof Buffer)) {
+    if(typeof options.body === 'object' && !(options.body instanceof Buffer) && !(options.body instanceof fs.ReadStream)) {
       headers['Content-Type'] = 'application/json';
       sendBody = JSON.stringify(options.body);
     } else {
       sendBody = options.body || '';
     }
-    headers['Content-Length'] = sendBody.length;
+    if(!headers['Content-Length'] && sendBody.length) headers['Content-Length'] = sendBody.length;
 
     headers['Authorization'] = this._getAuthToken(req, options.modifyConfig);
     if(options.modifyRequest) {
       req = options.modifyRequest(req);
     }
-    
+
     return new Promise((resolve, reject) => {
-      
+
       let reqHandle;
       const responseHandler = response => {
         // Server Error
-        if('droplr-errorcode' in response.headers) 
+        if('droplr-errorcode' in response.headers)
           return reject(new DroplrApiError(response));
-        
+
         let body = '';
         response.setEncoding('utf8');
         response.on('data', chunk => body += chunk);
@@ -201,8 +215,15 @@ class DroplrServer {
       reqHandle.on('error', error => {
         reject(error)
       });
-      reqHandle.write(sendBody);
-      reqHandle.end();
+
+      // We have to handle file streams differently
+      if(!(options.body instanceof fs.ReadStream)) {
+        reqHandle.write(sendBody);
+        reqHandle.end();
+      } else {
+        sendBody.pipe(reqHandle);
+      }
+
     });
   }
   _getAuthToken(req, modifyConfig) {
