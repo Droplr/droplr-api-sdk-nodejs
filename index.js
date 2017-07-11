@@ -94,8 +94,7 @@ class DroplrServer {
         'Content-Length': size
       },
       body: fs.createReadStream(file).on('data', (chunk) => {
-        bytes += chunk.length;
-        //console.log("Uploaded" + bytes += chunk.length, size);
+        bytes += chunk.length
         if(uploadProgressCB) uploadProgressCB(bytes/size)
       })
     })
