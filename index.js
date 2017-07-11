@@ -82,7 +82,7 @@ class DroplrServer {
       body: url
     });
   }
-  createDropFromFile(file) {
+  createDropFromFile(file, uploadProgressCB) {
     // return readFileToBuffer(file).then(data => this._performRequest({
     //   method: 'POST',
     //   path: '/files?filename=' + (path.basename(file)).replace( / /g, '-' ),
@@ -102,7 +102,9 @@ class DroplrServer {
         'Content-Length': size
       },
       body: fs.createReadStream(file).on('data', (chunk) => {
-        console.log(bytes += chunk.length, size);
+        bytes += chunk.length;
+        //console.log("Uploaded" + bytes += chunk.length, size);
+        if(uploadProgressCB) uploadProgressCB(bytes/size)
       })
     })
   }
