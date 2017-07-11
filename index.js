@@ -83,14 +83,6 @@ class DroplrServer {
     });
   }
   createDropFromFile(file, uploadProgressCB) {
-    // return readFileToBuffer(file).then(data => this._performRequest({
-    //   method: 'POST',
-    //   path: '/files?filename=' + (path.basename(file)).replace( / /g, '-' ),
-    //   headers: {
-    //     'Content-Type': mime.lookup(file)
-    //   },
-    //   body: data
-    // }));
     let size = fs.lstatSync(file).size;
     let bytes = 0;
 
