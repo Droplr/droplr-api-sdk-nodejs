@@ -112,7 +112,13 @@ class DroplrServer {
       skipParseResponse: true
     })
   }
-  getAllDrops(filter) {
+  getDrops(limit=50) {
+    return this._performRequest({
+      path: `/drops?limit=${limit}`,
+      skipParseResponse: false
+    })
+  }
+  searchAllDrops(filter) {
     var tagPath = (filter != undefined) ? '?tags[]=' + filter : ''
     return this._performRequest({
       path: '/search/' + tagPath,
