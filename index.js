@@ -112,9 +112,9 @@ class DroplrServer {
       skipParseResponse: true
     })
   }
-  getDrops(limit=50) {
+  getDrops(amount=50) {
     return this._performRequest({
-      path: `/drops?limit=${limit}`,
+      path: `/drops?amount=${amount}`,
       skipParseResponse: false
     })
   }
