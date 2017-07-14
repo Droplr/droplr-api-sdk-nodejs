@@ -38,10 +38,12 @@ class DroplrServer {
     this.email = ANONYMOUS_USER_EMAIL;
     this.password = ANONYMOUS_USER_PASSWORD;
     this.authType = config.plaintext === true ? AUTH_TYPE.ANON : AUTH_TYPE.DROPLR2;
+    this.isHashed = false; // If use account is not set
   }
-  useAccount(email, password) {
+  useAccount(email, password, isHashed=false) {
     this.email = email;
     this.password = password;
+    this.isHashed = isHashed;
     if(this.authType === AUTH_TYPE.ANON) {
       this.authType = AUTH_TYPE.DROPLR;
     }
@@ -52,6 +54,12 @@ class DroplrServer {
    *    Fields defined at: https://github.com/Droplr/docs/blob/master/source/includes/_private-operations.md#input-parameters
    *    Password passed as plaintext, will automatically be hashed.
    */
+  getAccount( token ) {
+    return this._performRequest({
+      method: 'GET',
+      path: '/api/userinfo/' + token,
+    })
+  }
   createAccount(user) {
     return this._performRequest({
       method: 'POST',
@@ -74,16 +82,22 @@ class DroplrServer {
       body: url
     });
   }
-  createDropFromFile(file) {
-    return readFileToBuffer(file).then(data => this._performRequest({
+  createDropFromFile(file, pixelDensity, uploadProgressCB) {
+    let size = fs.lstatSync(file).size;
+    let bytes = 0;
+
+    return this._performRequest({
       method: 'POST',
-      path: '/files',
+      path: '/files?filename=' + (path.basename(file)).replace( / /g, '-' ) + (`&pixel_density=${(pixelDensity ? pixelDensity : 1)}`),
       headers: {
-        'x-droplr-filename': path.basename(file),
-        'Content-Type': mime.lookup(file)
+        'Content-Type': mime.lookup(file),
+        'Content-Length': size
       },
-      body: data
-    }));
+      body: fs.createReadStream(file).on('data', (chunk) => {
+        bytes += chunk.length
+        if(uploadProgressCB) uploadProgressCB(bytes/size)
+      })
+    })
   }
   updateDrop(dropId, updateFields) {
     return this._performRequest({
@@ -96,6 +110,13 @@ class DroplrServer {
     return this._performRequest({
       path: '/drops/' + dropId,
       skipParseResponse: true
+    })
+  }
+  getAllDrops(filter) {
+    var tagPath = (filter != undefined) ? '?tags[]=' + filter : ''
+    return this._performRequest({
+      path: '/search/' + tagPath,
+      skipParseResponse: false
     })
   }
   /*
@@ -136,23 +157,22 @@ class DroplrServer {
       path: options.path,
       headers
     };
-
     let sendBody;
-    if(typeof options.body === 'object' && !(options.body instanceof Buffer)) {
+    if(typeof options.body === 'object' && !(options.body instanceof Buffer) && !(options.body instanceof fs.ReadStream)) {
       headers['Content-Type'] = 'application/json';
       sendBody = JSON.stringify(options.body);
     } else {
       sendBody = options.body || '';
     }
-    headers['Content-Length'] = sendBody.length;
+    if(!headers['Content-Length'] && sendBody.length) headers['Content-Length'] = sendBody.length;
 
     headers['Authorization'] = this._getAuthToken(req, options.modifyConfig);
-
     if(options.modifyRequest) {
       req = options.modifyRequest(req);
     }
 
     return new Promise((resolve, reject) => {
+
       let reqHandle;
       const responseHandler = response => {
         // Server Error
@@ -166,12 +186,12 @@ class DroplrServer {
           let parsedBody;
           if(!options.skipParseResponse) {
             try {
+              //console.log(body)
               parsedBody = JSON.parse(body);
             } catch(error) {
               return reject(error);
             }
           } else { parsedBody = body; }
-
           resolve({
             statusCode: response.statusCode,
             headers: response.headers,
@@ -179,7 +199,6 @@ class DroplrServer {
           });
         });
       };
-
       if(req.protocol === 'https:')
         reqHandle = https.request(req, responseHandler);
       else if(req.protocol === 'http:')
@@ -189,8 +208,15 @@ class DroplrServer {
       reqHandle.on('error', error => {
         reject(error)
       });
-      reqHandle.write(sendBody);
-      reqHandle.end();
+
+      // We have to handle file streams differently
+      if(!(options.body instanceof fs.ReadStream)) {
+        reqHandle.write(sendBody);
+        reqHandle.end();
+      } else {
+        sendBody.pipe(reqHandle);
+      }
+
     });
   }
   _getAuthToken(req, modifyConfig) {
@@ -200,12 +226,12 @@ class DroplrServer {
     switch(this.authType) {
       case AUTH_TYPE.DROPLR:
       case AUTH_TYPE.ANON:
-        const secret = util.format('%s:%s', config.privateKey, sha1(this.password));
+        const secret = util.format('%s:%s', config.privateKey, (this.isHashed) ? this.password : sha1(this.password));
         const signature = calculateRfc2104Hmac(stringToSign, secret);
         return util.format('%s %s:%s', this.authType, key, signature);
       case AUTH_TYPE.DROPLR2:
         const signatureV2 = calculateRfc2104Hmac(stringToSign, config.privateKey);
-        return util.format('%s %s:%s:%s', this.authType, key, signatureV2, sha1(this.password));
+        return util.format('%s %s:%s:%s', this.authType, key, signatureV2, (this.isHashed) ? this.password : sha1(this.password));
     }
   }
 }
