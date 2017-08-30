@@ -82,13 +82,13 @@ class DroplrServer {
       body: url
     });
   }
-  createDropFromFile(file, pixelDensity, uploadProgressCB) {
+  createDropFromFile(file, filename, pixelDensity, uploadProgressCB) {
     let size = fs.lstatSync(file).size;
     let bytes = 0;
 
     return this._performRequest({
       method: 'POST',
-      path: '/files?filename=' + encodeURIComponent(path.basename(file)) + (`&pixel_density=${(pixelDensity ? pixelDensity : 1)}`),
+      path: '/files?filename=' + encodeURIComponent(filename) + (`&pixel_density=${(pixelDensity ? pixelDensity : 1)}`),
       headers: {
         'Content-Type': mime.lookup(file),
         'Content-Length': size
