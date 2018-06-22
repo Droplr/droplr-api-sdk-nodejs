@@ -125,6 +125,12 @@ class DroplrServer {
       skipParseResponse: false
     })
   }
+  getMe() {
+    return this._performRequest({
+      path: '/users/me',
+      skipParseResponse: false
+    })
+  }
   /*
    * @param options           Object
    * @option method           String
