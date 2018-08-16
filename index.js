@@ -82,11 +82,11 @@ class DroplrServer {
       body: url
     });
   }
-  createDropForNote(note, type, title) {
+  createDropForNote(note, type) {
     return this._performRequest({
       method: 'POST',
       path: '/notes',
-      headers: { 'Content-Type': title },
+      headers: { 'Content-Type': type },
       body: note
     });
   }
