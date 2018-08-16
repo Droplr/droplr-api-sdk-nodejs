@@ -82,6 +82,14 @@ class DroplrServer {
       body: url
     });
   }
+  createDropForNote(note, type, title) {
+    return this._performRequest({
+      method: 'POST',
+      path: '/notes',
+      headers: { 'Content-Type': title },
+      body: note
+    });
+  }
   createDropFromFile(file, filename, pixelDensity, uploadProgressCB) {
     let size = fs.lstatSync(file).size;
     let bytes = 0;
