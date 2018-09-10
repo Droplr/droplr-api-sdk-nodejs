@@ -1,3 +1,10 @@
+DEPRECATED
+========
+
+Use https://github.com/Droplr/droplr-js instead.
+
+--------
+
 # Droplr API SDK (Node.js)
 
 Include in a package.json file using the github address:
